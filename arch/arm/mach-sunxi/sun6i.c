@@ -34,6 +34,11 @@ static void __init sun6i_dt_init(void)
 	clk = clk_get(NULL, "cpu");
 	if (!IS_ERR(clk))
 		clk_prepare_enable(clk);
+
+	/* DDR gating clock */
+	clk = clk_get(NULL, "ahb1_sdram");
+	if (!IS_ERR(clk))
+		clk_prepare_enable(clk);
 }
 
 extern void __init sun6i_reset_init(void);
