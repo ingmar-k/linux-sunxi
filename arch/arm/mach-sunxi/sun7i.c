@@ -10,6 +10,7 @@
  * warranty of any kind, whether express or implied.
  */
 
+#include <linux/clk.h>
 #include <linux/init.h>
 #include <linux/of_platform.h>
 
@@ -19,9 +20,22 @@
 
 static void __init sun7i_dt_init(void)
 {
+	struct clk *clk;
+
 	sunxi_setup_restart();
 
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+
+	/* Make sure the clocks we absolutely need are enabled */
+	/* Memory bus clock */
+	clk = clk_get(NULL, "mbus");
+	if (!IS_ERR(clk))
+		clk_prepare_enable(clk);
+
+	/* DDR clock */
+	clk = clk_get(NULL, "pll5_ddr");
+	if (!IS_ERR(clk))
+		clk_prepare_enable(clk);
 }
 
 static const char * const sun7i_board_dt_compat[] = {
