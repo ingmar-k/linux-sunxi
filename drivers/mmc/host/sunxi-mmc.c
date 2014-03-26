@@ -31,6 +31,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
+#include <linux/reset.h>
 
 #include <linux/of_address.h>
 #include <linux/of_gpio.h>
@@ -64,6 +65,16 @@ static int sunxi_mmc_init_host(struct mmc_host *mmc)
 		return ret;
 	}
 
+	if (smc_host->reset) {
+		ret = reset_control_deassert(smc_host->reset);
+		if (ret) {
+			dev_err(mmc_dev(smc_host->mmc), "reset err %d\n", ret);
+			clk_disable_unprepare(smc_host->clk_ahb);
+			clk_disable_unprepare(smc_host->clk_mod);
+			return ret;
+		}
+	}
+
 	/* reset controller */
 	rval = mci_readl(smc_host, REG_GCTRL) | SDXC_HARDWARE_RESET;
 	mci_writel(smc_host, REG_GCTRL, rval);
@@ -85,6 +96,10 @@ static int sunxi_mmc_init_host(struct mmc_host *mmc)
 static void sunxi_mmc_exit_host(struct sunxi_mmc_host *smc_host)
 {
 	mci_writel(smc_host, REG_GCTRL, SDXC_HARDWARE_RESET);
+
+	if (smc_host->reset)
+		reset_control_assert(smc_host->reset);
+
 	clk_disable_unprepare(smc_host->clk_ahb);
 	clk_disable_unprepare(smc_host->clk_mod);
 }
@@ -737,6 +752,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
 		dev_err(&pdev->dev, "Could not get mod clock\n");
 		return PTR_ERR(host->clk_mod);
 	}
+
+	host->reset = devm_reset_control_get(&pdev->dev, "reset");
+	if (IS_ERR(host->reset))
+		host->reset = NULL; /* Having a reset controller is optional */
 
 	/* Make sure the controller is in a sane state before enabling irqs */
 	ret = sunxi_mmc_init_host(host->mmc);
